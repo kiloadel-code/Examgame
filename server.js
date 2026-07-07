@@ -55,11 +55,14 @@ ${emailText}`;
         res.status(500).json({ error: 'حدث خطأ في الاتصال بالذكاء الاصطناعي.' });
     }
 });
+// في بيئة Vercel لا نحتاج لـ app.listen التقليدي
+if (process.env.NODE_ENV !== 'production') {
+    app.listen(port, () => {
+        console.log(`Server running on port ${port}`);
+    });
+}
 
-// بدء تشغيل الخادم
-app.listen(port, () => {
-    console.log(`الخادم يعمل بنجاح على المنفذ ${port}`);
-});
 module.exports = app;
+
 
 
