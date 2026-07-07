@@ -60,4 +60,6 @@ ${emailText}`;
 app.listen(port, () => {
     console.log(`الخادم يعمل بنجاح على المنفذ ${port}`);
 });
+module.exports = app;
+
 
