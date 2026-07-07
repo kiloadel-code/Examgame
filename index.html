@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تحدي تخمين النقطة 🎯</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 450px;
+            text-align: center;
+        }
+        h1 { color: #333; margin-bottom: 5px; font-size: 24px; }
+        p { color: #666; font-size: 14px; margin-bottom: 20px; }
+        textarea, input[type="number"] {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 15px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+        textarea:focus, input:focus { border-color: #007bff; outline: none; }
+        button {
+            width: 100%;
+            padding: 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button:hover { background-color: #0056b3; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        /* ألوان التلميحات */
+        .feedback { margin-top: 20px; padding: 15px; border-radius: 10px; font-weight: bold; display: none; }
+        .hot { background-color: #ffeaea; color: #d9534f; border: 1px solid #d9534f; }
+        .warm { background-color: #fff4cc; color: #f0ad4e; border: 1px solid #f0ad4e; }
+        .cold { background-color: #e6f2ff; color: #0275d8; border: 1px solid #0275d8; }
+        .success { background-color: #d4edda; color: #28a745; border: 1px solid #28a745; }
+        
+        #step2 { display: none; }
+        .stats { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 15px; color: #555; }
+        #shareButton { background-color: #25d366; margin-top: 15px; display: none; }
+        #shareButton:hover { background-color: #1ebe57; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>تحدي النقطة 🎯</h1>
+    
+    <div id="step1">
+        <p>ألصق رسالة Outlook هنا ليقرأها الذكاء الاصطناعي ويخبئ النقطة!</p>
+        <textarea id="emailInput" rows="5" placeholder="ألصق نص رسالة النتائج هنا..."></textarea>
+        <button id="extractBtn" onclick="startGame()">خبئ النقطة وابدأ 🚀</button>
+        <p id="loadingMsg" style="display: none; color: #007bff; margin-top: 10px;">🤖 جاري قراءة الرسالة وتشفير النقطة...</p>
+    </div>
+
+    <div id="step2">
+        <div class="stats">
+            <span>المحاولات: <b id="attemptsCount">0</b></span>
+            <span>النطاق: 0 إلى 20</span>
+        </div>
+        <p>تم إخفاء النقطة بنجاح! خمن نقطتك (مع رقمين بعد الفاصلة):</p>
+        <input type="number" id="guessInput" step="0.01" min="0" max="20" placeholder="مثال: 15.25">
+        <button onclick="checkGuess()">تحقق 🔍</button>
+        
+        <div id="feedbackBox" class="feedback"></div>
+        <button id="shareButton" onclick="shareResult()">مشاركة النتيجة 📲</button>
+    </div>
+</div>
+
+<script>
+    let hiddenScore = 0;
+    let attempts = 0;
+
+    // دالة إرسال النص للباك آند (الذي سيكلم Gemini)
+    async function startGame() {
+        const text = document.getElementById('emailInput').value;
+        const btn = document.getElementById('extractBtn');
+        const loading = document.getElementById('loadingMsg');
+
+        if (!text.trim()) {
+            alert('الرجاء لصق رسالة النتائج أولاً!');
+            return;
+        }
+
+        btn.disabled = true;
+        loading.style.display = 'block';
+
+        try {
+            const response = await fetch('/api/extract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ emailText: text })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                hiddenScore = data.score;
+                document.getElementById('step1').style.display = 'none';
+                document.getElementById('step2').style.display = 'block';
+            } else {
+                alert(data.error);
+                btn.disabled = false;
+            }
+        } catch (error) {
+            alert('حدث خطأ في الاتصال بالخادم. تأكد من إعداداتك.');
+            btn.disabled = false;
+        } finally {
+            loading.style.display = 'none';
+        }
+    }
+
+    // دالة فحص التخمين ونظام التلميحات (ساخن/بارد)
+    function checkGuess() {
+        const guess = parseFloat(document.getElementById('guessInput').value);
+        const feedback = document.getElementById('feedbackBox');
+        
+        if (isNaN(guess) || guess < 0 || guess > 20) {
+            alert("الرجاء إدخال رقم صحيح بين 0 و 20");
+            return;
+        }
+
+        attempts++;
+        document.getElementById('attemptsCount').innerText = attempts;
+        feedback.style.display = 'block';
+        feedback.className = 'feedback'; // إعادة تعيين الكلاسات
+
+        // حساب الفارق المطلق
+        const diff = Math.abs(guess - hiddenScore);
+        
+        // تحديد الاتجاه (أكبر / أصغر)
+        const directionText = (guess < hiddenScore) 
+            ? "صوب نحو الأعلى! 🚀 (النقطة أكبر ⬆️)" 
+            : "انزل قليلاً! 📉 (النقطة أصغر ⬇️)";
+
+        if (diff === 0) {
+            feedback.innerHTML = `🎉 أسطورة! حزرتها بالملليمتير! نقطتك هي: ${hiddenScore}`;
+            feedback.classList.add('success');
+            document.getElementById('shareButton').style.display = 'block';
+        } else if (diff <= 0.5) {
+            feedback.innerHTML = `🔥 مشتعل! أنت قريب جداً جداً!<br>${directionText}`;
+            feedback.classList.add('hot');
+        } else if (diff <= 2) {
+            feedback.innerHTML = `☀️ دافئ! أنت تقترب من النقطة.<br>${directionText}`;
+            feedback.classList.add('warm');
+        } else {
+            feedback.innerHTML = `❄️ بارد! أنت بعيد عن النقطة.<br>${directionText}`;
+            feedback.classList.add('cold');
+        }
+    }
+
+    // دالة المشاركة
+    function shareResult() {
+        const text = `🎯 تحدي تخمين النقطة!\nلقد تمكنت من حزر نقطتي الحقيقية في الامتحان الموحد بعد ${attempts} محاولات فقط! 💥\nهل يمكنك تحطيم رقمي القياسي؟`;
+        
+        if (navigator.share) {
+            navigator.share({
+                title: 'تحدي النقطة',
+                text: text
+            }).catch(console.error);
+        } else {
+            navigator.clipboard.writeText(text).then(() => {
+                alert("تم نسخ النتيجة بنجاح! يمكنك لصقها وإرسالها لأصدقائك.");
+            });
+        }
+    }
+</script>
+
+</body>
+</html>
+
